@@ -1,4 +1,11 @@
-import { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonInteraction,
+  ButtonStyle,
+  ChatInputCommandInteraction,
+  TextChannel
+} from "discord.js";
 import ActiveOrder from "../schemas/ActiveOrder";
 import { toTitleCase } from "./Utils";
 import { container } from "@sapphire/framework";
@@ -103,17 +110,7 @@ export async function responseActive(order, interaction: ChatInputCommandInterac
 {
   if (!interaction.deferred) await interaction.deferReply();
 
-  const message =
-    `# Order ID: ${order.order_id}\n` +
-    `**Customer**: ${order.name} - ${order.phone_number || "No Phone Number"}\n` +
-    `**Class**: ${order.class}\n` +
-    `**Has to pay**: ${order.price.toLocaleString()}\n\n` +
-    `## Order Items\n` +
-    order.items_total.map((item) =>
-    {
-      return `x${item.number} ${item.fullName} (${toTitleCase(item.state)}) - ${item.id}`;
-    }).join("\n");
-
+  const message = generateMessageActive(order);
   await interaction.editReply({ content: message, });
 }
 
@@ -126,17 +123,85 @@ export async function responseFinished(fOrder, interaction: ChatInputCommandInte
 {
   if (!interaction.deferred) await interaction.deferReply();
 
-  const message =
-    `# Order ID: ${fOrder.order_id} | ${(fOrder.status as string).toUpperCase()}\n` +
+  const message = generateMessageFinished(fOrder);
+  await interaction.editReply({ content: message, });
+}
+
+/**
+ * Generate a message for finished order
+ * @param fOrder
+ */
+export function generateMessageFinished(fOrder)
+{
+  return `# Order ID: ${fOrder.order_id} | ${(fOrder.status as string).toUpperCase()}\n` +
     `**Customer**: ${fOrder.name} - ${fOrder.phone_number || "No Phone Number"}\n` +
     `**Class**: ${fOrder.class}\n` +
     `**Has to pay**: ${fOrder.price.toLocaleString()}\n\n` +
     `## Order Items\n` +
-    fOrder.items_total.map((item) =>
+    fOrder.items_total.map((item) => 
     {
       return `x${item.number} ${item.fullName} (${toTitleCase(item.state)}) - ${item.id}`;
     }).join("\n") + "\n\n" +
     `### Time: <t:${fOrder.completion_time}:R>`;
+}
 
-  await interaction.editReply({ content: message, });
+/**
+ * Generate a message for active order
+ * @param order
+ */
+export function generateMessageActive(order)
+{
+  return `# Order ID: ${order.order_id}\n` +
+    `**Customer**: ${order.name} - ${order.phone_number || "No Phone Number"}\n` +
+    `**Class**: ${order.class}\n` +
+    `**Has to pay**: ${order.price.toLocaleString()}\n\n` +
+    `## Order Items\n` +
+    order.items_total.map((item) => 
+    {
+      return `x${item.number} ${item.fullName} (${toTitleCase(item.state)}) - ${item.id}`;
+    }).join("\n");
+}
+
+/**
+ * Check all the active order in the database to make sure they are posted
+ */
+export async function postChecking(channel: TextChannel)
+{
+  const cursor = await ActiveOrder.find({}).cursor();
+  cursor.on("data", async (doc) => 
+  {
+    if (!doc.posted)
+    {
+      const order = await ActiveOrder.findOne({ order_id: doc.order_id, });
+      const componentRow = new ActionRowBuilder<ButtonBuilder>()
+        .setComponents(
+          new ButtonBuilder()
+            .setStyle(ButtonStyle.Success)
+            .setEmoji("✅")
+            .setLabel("Completed/Shipped!")
+            .setCustomId(`COMP-${order.order_id}`),
+          new ButtonBuilder()
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji("❌")
+            .setLabel("Cancelled")
+            .setCustomId(`CANC-${order.order_id}`)
+        );
+
+      const message = generateMessageActive(doc);
+      await channel.send({ content: message, components: [componentRow], });
+
+      await order.updateOne({ posted: true, });
+    }
+  });
+
+  cursor.on("end", () => 
+  {
+    container.logger.info("Finished checking all documents");
+  });
+
+  cursor.on("error", (err) =>
+  {
+    console.log(err);
+    container.logger.error("Failed to check all documents");
+  });
 }
