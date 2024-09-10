@@ -2,7 +2,7 @@ import FinishedOrder from "../../schemas/FinishedOrder";
 import { Listener, ListenerOptions } from "@sapphire/framework";
 import { ApplyOptions } from "@sapphire/decorators";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, TextChannel } from "discord.js";
-import { toTitleCase } from "../../lib/Utils";
+import { generateMessageFinished } from "../../lib/Database";
 
 @ApplyOptions<ListenerOptions>({
   emitter: FinishedOrder.watch(),
@@ -28,18 +28,7 @@ export class FinishedOrderChangeListener extends Listener
           .setCustomId(`REST-${fOrder.order_id}`)
       );
 
-    const message =
-      `# Order ID: ${fOrder.order_id} | ${(fOrder.status as string).toUpperCase()}\n` +
-      `**Customer**: ${fOrder.name} - ${fOrder.phone_number || "No Phone Number"}\n` +
-      `**Class**: ${fOrder.class}\n` +
-      `**Has to pay**: ${fOrder.price.toLocaleString()}\n\n` +
-      `## Order Items\n` +
-      fOrder.items_total.map((item) =>
-      {
-        return `x${item.number} ${item.fullName} (${toTitleCase(item.state)}) - ${item.id}`;
-      }).join("\n") + "\n\n" +
-      `### Time: <t:${fOrder.completion_time}:R>`;
-
+    const message = generateMessageFinished(fOrder);
     await channel.send({ content: message, components: [componentRow], });
   }
 }

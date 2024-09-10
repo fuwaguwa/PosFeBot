@@ -2,7 +2,7 @@ import { Listener, ListenerOptions } from "@sapphire/framework";
 import { ApplyOptions } from "@sapphire/decorators";
 import ActiveOrder from "../../schemas/ActiveOrder";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, TextChannel } from "discord.js";
-import { toTitleCase } from "../../lib/Utils";
+import { generateMessageActive } from "../../lib/Database";
 
 @ApplyOptions<ListenerOptions>({
   emitter: ActiveOrder.watch(),
@@ -33,17 +33,14 @@ export class ActiveOrderChange extends Listener
           .setCustomId(`CANC-${order.order_id}`)
       );
 
-    const message =
-      `# Order ID: ${order.order_id}\n` +
-      `**Customer**: ${order.name} - ${order.phone_number || "No Phone Number"}\n` +
-      `**Class**: ${order.class}\n` +
-      `**Has to pay**: ${order.price.toLocaleString()}\n\n` +
-      `## Order Items\n` +
-      order.items_total.map((item) =>
-      {
-        return `x${item.number} ${item.fullName} (${toTitleCase(item.state)}) - ${item.id}`;
-      }).join("\n");
+    const message = generateMessageActive(order);
 
     await channel.send({ content: message, components: [componentRow], });
+
+    if (!order.posted)
+    {
+      const order_db = await ActiveOrder.findOne({ order_id: order.order_id, });
+      await order_db.updateOne({ posted: true, });
+    }
   }
 }

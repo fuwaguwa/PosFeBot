@@ -24,7 +24,7 @@ export function connectToDatabase()
   });
 }
 
-function getGuildInfo(guild: Guild | null): string 
+function getGuildInfo(guild: Guild): string
 {
   return guild == null ? "| Direct Message" : `${guild.name} - ${cyan(guild.id)} `;
 }
@@ -45,7 +45,7 @@ function getShardInfo(shardId: number)
 }
 
 
-export function getSuccessfulLoggerData(guild: Guild | null, user: User, command: Command) 
+export function getSuccessfulLoggerData(guild: Guild, user: User, command: Command)
 {
   const shard = getShardInfo(guild?.shardId ?? 0);
   const commandName = getCommandInfo(command);
@@ -55,7 +55,7 @@ export function getSuccessfulLoggerData(guild: Guild | null, user: User, command
   return { shard, commandName, author, originGuild, };
 }
 
-export function logSuccessfulCommand(payload: ContextMenuCommandSuccessPayload | ChatInputCommandSuccessPayload | MessageCommandSuccessPayload | ChatInputSubcommandSuccessPayload, subcommand?: ChatInputCommandSubcommandMappingMethod): void 
+export function logSuccessfulCommand(payload: ContextMenuCommandSuccessPayload | ChatInputCommandSuccessPayload | MessageCommandSuccessPayload | ChatInputSubcommandSuccessPayload, subcommand?: ChatInputCommandSubcommandMappingMethod): void
 {
   let successData: ReturnType<typeof getSuccessfulLoggerData>;
 
@@ -132,7 +132,7 @@ export function startCatchers(client: SapphireClient)
   {
     this.logger.info("Reconnected to the database!");
   });
-
+ 
   mongoose.connection.on("error", (err) => 
   {
     this.logger.error(err);
